@@ -1,11 +1,29 @@
 let capturedData = [];
 
+// コンテキストメニューの作成
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "clear-captured-data",
+    title: "キャプチャデータをクリア",
+    contexts: ["all"],
+  });
+});
+
+// コンテキストメニュークリック時のハンドラー
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "clear-captured-data") {
+    const count = capturedData.length;
+    capturedData = [];
+    console.log(`Cleared ${count} captured entries`);
+  }
+});
+
 chrome.webRequest.onBeforeRequest.addListener(
   async (details) => {
     const url = details.url;
     if (url.includes(".m3u8")) {
       let title = "Unknown Title";
-      
+
       // tabIdからタブの情報を取得
       if (details.tabId >= 0) {
         try {
@@ -20,26 +38,28 @@ chrome.webRequest.onBeforeRequest.addListener(
         timestamp: new Date().toISOString(),
         title: title, // ページのタイトル
         url: url,
-        method: details.method
+        method: details.method,
       };
-      
+
       capturedData.push(entry);
       console.log("Captured with Title:", entry);
     }
   },
-  { urls: ["<all_urls>"] }
+  { urls: ["<all_urls>"] },
 );
 
 // ダウンロード処理（前回と同じ）
 chrome.action.onClicked.addListener(() => {
   if (capturedData.length === 0) return;
-  const jsonlContent = capturedData.map(item => JSON.stringify(item)).join("\n");
+  const jsonlContent = capturedData
+    .map((item) => JSON.stringify(item))
+    .join("\n");
   const blob = new Blob([jsonlContent], { type: "application/x-jsonlines" });
   const reader = new FileReader();
   reader.onloadend = () => {
     chrome.downloads.download({
       url: reader.result,
-      filename: `captured_m3u8_${Date.now()}.jsonl`
+      filename: `captured_m3u8_${Date.now()}.jsonl`,
     });
   };
   reader.readAsDataURL(blob);
